@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>doc_to_json — question paper pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF0EA;
+    --sheet:#F8F9F5;
+    --ink:#1C2B2A;
+    --ink-soft:#4B5C58;
+    --line:#C3CCC3;
+    --line-soft:#DCE2D9;
+    --accent:#B8791E;
+    --accent-ink:#5C3D0F;
+    --ok:#3E7D5A;
+    --ok-bg:#E6F0E9;
+    --err:#B23A2E;
+    --err-bg:#F5E6E4;
+    --run:#3B6FA0;
+    --run-bg:#E5EDF4;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:28px 28px;
+    color:var(--ink);
+    font-family:"Space Grotesk", sans-serif;
+    min-height:100vh;
+    padding:32px 20px 64px;
+  }
+  .wrap{max-width:1040px; margin:0 auto;}
+
+  /* ---- title block, like a drawing sheet header ---- */
+  .titleblock{
+    border:1.5px solid var(--ink);
+    background:var(--sheet);
+    display:grid;
+    grid-template-columns:1fr auto;
+    align-items:stretch;
+    margin-bottom:28px;
+  }
+  .titleblock__main{padding:20px 24px;}
+  .titleblock__main h1{
+    margin:0 0 4px;
+    font-size:1.5rem;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .titleblock__main p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:0.92rem;
+    max-width:52ch;
+  }
+  .titleblock__meta{
+    display:flex;
+    flex-direction:column;
+    border-left:1.5px solid var(--ink);
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.72rem;
+  }
+  .titleblock__meta div{
+    padding:8px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    min-width:220px;
+    max-width:360px;
+  }
+  .titleblock__meta div:last-child{border-bottom:none;}
+  .titleblock__meta .label{color:var(--ink-soft); flex-shrink:0;}
+  .titleblock__meta .val{
+    font-weight:600;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    text-align:right;
+  }
+  .val.yes{color:var(--ok);}
+  .val.no{color:var(--err);}
+
+  /* ---- two-panel layout ---- */
+  .panels{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    gap:20px;
+  }
+  @media (max-width:760px){
+    .panels{grid-template-columns:1fr;}
+    .titleblock{grid-template-columns:1fr;}
+    .titleblock__meta{border-left:none; border-top:1.5px solid var(--ink);}
+  }
+
+  .panel{
+    border:1.5px solid var(--ink);
+    background:var(--sheet);
+    display:flex;
+    flex-direction:column;
+  }
+  .panel__head{
+    padding:14px 18px;
+    border-bottom:1.5px solid var(--ink);
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .panel__head h2{
+    margin:0;
+    font-size:1.05rem;
+    font-weight:600;
+  }
+  .panel__head span{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.7rem;
+    color:var(--ink-soft);
+  }
+  .panel__body{padding:18px; display:flex; flex-direction:column; gap:14px;}
+
+  /* ---- drop zone ---- */
+  .dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:var(--radius);
+    padding:22px 16px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    background:var(--paper);
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--accent);
+    background:#F3EBDC;
+  }
+  .dropzone p{margin:0; font-size:0.88rem; color:var(--ink-soft);}
+  .dropzone strong{color:var(--ink); font-weight:600;}
+  .dropzone input{display:none;}
+  .filelist{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.72rem;
+    color:var(--ink-soft);
+    max-height:70px;
+    overflow-y:auto;
+    text-align:left;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line-soft);
+    display:none;
+  }
+  .filelist.show{display:block;}
+
+  .checkrow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    cursor:pointer;
+    user-select:none;
+  }
+  .checkrow input{width:14px; height:14px; accent-color:var(--accent);}
+  .checkrow strong{color:var(--ink); font-weight:600;}
+
+  button.run{
+    font-family:"Space Grotesk", sans-serif;
+    font-weight:600;
+    font-size:0.9rem;
+    padding:10px 18px;
+    border:1.5px solid var(--ink);
+    background:var(--ink);
+    color:var(--sheet);
+    border-radius:var(--radius);
+    cursor:pointer;
+    transition:opacity .15s ease;
+  }
+  button.run:hover{opacity:0.85;}
+  button.run:disabled{opacity:0.4; cursor:not-allowed;}
+
+  /* ---- status chip ---- */
+  .status{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.72rem;
+    padding:3px 9px;
+    border-radius:99px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    width:fit-content;
+  }
+  .status::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+  .status.idle{color:var(--ink-soft); background:var(--line-soft);}
+  .status.run{color:var(--run); background:var(--run-bg);}
+  .status.done{color:var(--ok); background:var(--ok-bg);}
+  .status.error{color:var(--err); background:var(--err-bg);}
+
+  /* ---- console ---- */
+  .console{
+    background:#16211F;
+    color:#D9E4DD;
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.76rem;
+    line-height:1.55;
+    padding:12px 14px;
+    border-radius:var(--radius);
+    height:220px;
+    overflow-y:auto;
+    white-space:pre-wrap;
+    word-break:break-word;
+    display:none;
+  }
+  .console.show{display:block;}
+  .console .ok{color:#7FD9A6;}
+  .console .warn{color:#E8B563;}
+  .console .err{color:#F09088;}
+  .console .dim{color:#7C8B86;}
+
+  .summary{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.78rem;
+    display:none;
+  }
+  .summary.show{display:block;}
+  .summary table{border-collapse:collapse; width:100%;}
+  .summary td{padding:3px 0; border-bottom:1px solid var(--line-soft);}
+  .summary td:last-child{text-align:right; font-weight:600;}
+
+  .pathnote{
+    margin:0;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    line-height:1.5;
+  }
+  .pathnote code{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:0.78rem;
+    color:var(--ink);
+    word-break:break-all;
+  }
+
+  footer{
+    max-width:1040px;
+    margin:28px auto 0;
+    font-size:0.76rem;
+    color:var(--ink-soft);
+    font-family:"IBM Plex Mono", monospace;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="titleblock">
+    <div class="titleblock__main">
+      <h1>doc_to_json pipeline</h1>
+      <p>Convert exam-paper .docx files into question-bank JSON, or refresh expired image URLs in JSON already there. Results are written directly to the folder below -- no download step.</p>
+    </div>
+    <div class="titleblock__meta">
+      <div><span class="label">output path</span><span class="val" title="{{ result_path }}">{{ result_path }}</span></div>
+      <div><span class="label">BEARER_TOKEN</span><span class="val {{ 'yes' if bearer_configured else 'no' }}">{{ 'configured' if bearer_configured else 'missing' }}</span></div>
+      <div><span class="label">ques_TOKEN</span><span class="val {{ 'yes' if ques_token_configured else 'no' }}">{{ 'configured' if ques_token_configured else 'missing' }}</span></div>
+      <div><span class="label">runs on</span><span class="val">127.0.0.1:5000</span></div>
+    </div>
+  </div>
+
+  <div class="panels">
+
+    <!-- CONVERT PANEL -->
+    <section class="panel" data-kind="convert" data-endpoint="/convert">
+      <div class="panel__head">
+        <h2>Convert</h2>
+        <span>.docx → .json</span>
+      </div>
+      <div class="panel__body">
+        <label class="dropzone" data-role="dropzone">
+          <p><strong>Choose a folder</strong> of .docx files<br>or drag one here</p>
+          <input type="file" webkitdirectory directory multiple data-role="input">
+        </label>
+        <div class="filelist" data-role="filelist"></div>
+        <button class="run" data-role="run" disabled>Run conversion</button>
+        <span class="status idle" data-role="status">idle</span>
+        <div class="console" data-role="console"></div>
+        <div class="summary" data-role="summary"></div>
+        <p class="pathnote" data-role="pathnote">Writes into <code>{{ result_path }}</code></p>
+      </div>
+    </section>
+
+    <!-- REFRESH PANEL -->
+    <section class="panel" data-kind="refresh" data-endpoint="/refresh" data-no-upload="true">
+      <div class="panel__head">
+        <h2>Refresh URLs</h2>
+        <span>re-sign expired image links</span>
+      </div>
+      <div class="panel__body">
+        <p class="pathnote">Refreshes every .json already in <code>{{ result_path }}</code> in place -- nothing to upload.</p>
+        <button class="run" data-role="run">Run refresh</button>
+        <span class="status idle" data-role="status">idle</span>
+        <div class="console" data-role="console"></div>
+        <div class="summary" data-role="summary"></div>
+      </div>
+    </section>
+
+    <!-- UPLOAD TO DB PANEL -->
+    <section class="panel" data-kind="upload_db" data-endpoint="/upload_db" data-accept=".json" data-extra-form="dry_run">
+      <div class="panel__head">
+        <h2>Upload to DB</h2>
+        <span>.json → SaveQuestion API</span>
+      </div>
+      <div class="panel__body">
+        <label class="dropzone" data-role="dropzone">
+          <p><strong>Choose .json files</strong><br>or drag them here</p>
+          <input type="file" accept=".json" multiple data-role="input">
+        </label>
+        <div class="filelist" data-role="filelist"></div>
+        <label class="checkrow">
+          <input type="checkbox" data-role="dry-run" checked>
+          <span><strong>Dry run</strong> -- print payloads, don't call the API</span>
+        </label>
+        <button class="run" data-role="run" disabled>Upload</button>
+        <span class="status idle" data-role="status">idle</span>
+        <div class="console" data-role="console"></div>
+        <div class="summary" data-role="summary"></div>
+        <p class="pathnote">Uncheck "Dry run" once you've confirmed the payloads look right. This calls the live QuestionBank API and writes real rows.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>Runs entirely on this machine. Outbound calls: image uploads to your configured SFM_UPLOAD_URL, and (Upload to DB, when Dry run is off) question inserts to your configured API_BASE_URL.</footer>
+</div>
+
+<script>
+document.querySelectorAll(".panel").forEach(setupPanel);
+
+function setupPanel(panel){
+  const endpoint = panel.dataset.endpoint;
+  const noUpload = panel.dataset.noUpload === "true";
+  const acceptExt = panel.dataset.accept || null; // e.g. ".json" -- restricts drag-and-drop, not just the file picker
+  const dropzone = panel.querySelector('[data-role="dropzone"]');
+  const input = panel.querySelector('[data-role="input"]');
+  const filelist = panel.querySelector('[data-role="filelist"]');
+  const runBtn = panel.querySelector('[data-role="run"]');
+  const statusEl = panel.querySelector('[data-role="status"]');
+  const consoleEl = panel.querySelector('[data-role="console"]');
+  const summaryEl = panel.querySelector('[data-role="summary"]');
+  const dryRunEl = panel.querySelector('[data-role="dry-run"]');
+
+  let chosenFiles = [];
+
+  // The refresh panel has no dropzone at all -- it operates on whatever's
+  // already in the output path, so its Run button is enabled from the
+  // start and there's nothing here to wire up.
+  if (!noUpload && dropzone) {
+    input.addEventListener("change", () => {
+      chosenFiles = Array.from(input.files);
+      if (acceptExt) {
+        chosenFiles = chosenFiles.filter(f => f.name.toLowerCase().endsWith(acceptExt));
+      }
+      renderFileList();
+    });
+
+    dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("drag"); });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+    dropzone.addEventListener("drop", async e => {
+      e.preventDefault();
+      dropzone.classList.remove("drag");
+      const items = e.dataTransfer.items;
+      if (items && items.length && items[0].webkitGetAsEntry) {
+        chosenFiles = await filesFromDataTransferItems(items);
+      } else {
+        chosenFiles = Array.from(e.dataTransfer.files);
+      }
+      if (acceptExt) {
+        chosenFiles = chosenFiles.filter(f => f.name.toLowerCase().endsWith(acceptExt));
+      }
+      renderFileList();
+    });
+  }
+
+  function renderFileList(){
+    if (!chosenFiles.length){
+      filelist.classList.remove("show");
+      runBtn.disabled = true;
+      return;
+    }
+    const names = chosenFiles.slice(0, 12).map(f => f.webkitRelativePath || f.name);
+    let extra = chosenFiles.length > 12 ? `\n… and ${chosenFiles.length - 12} more` : "";
+    filelist.textContent = names.join("\n") + extra;
+    filelist.classList.add("show");
+    runBtn.disabled = false;
+  }
+
+  function filesFromDataTransferItems(items){
+    const out = [];
+    function walk(entry, path){
+      return new Promise(resolve => {
+        if (entry.isFile){
+          entry.file(file => {
+            Object.defineProperty(file, "webkitRelativePath", { value: path + file.name });
+            out.push(file);
+            resolve();
+          });
+        } else if (entry.isDirectory){
+          const reader = entry.createReader();
+          reader.readEntries(async entries => {
+            for (const e of entries) await walk(e, path + entry.name + "/");
+            resolve();
+          });
+        } else {
+          resolve();
+        }
+      });
+    }
+    const entries = Array.from(items).map(i => i.webkitGetAsEntry()).filter(Boolean);
+    return Promise.all(entries.map(e => walk(e, ""))).then(() => out);
+  }
+
+  runBtn.addEventListener("click", () => runJob());
+
+  async function runJob(){
+    // Extra confirmation before a real (non-dry-run) write to the live
+    // database -- this is the one panel here that isn't easily undone.
+    if (dryRunEl && !dryRunEl.checked) {
+      const ok = confirm("Dry run is OFF. This will call the live SaveQuestion API and write real rows. Continue?");
+      if (!ok) return;
+    }
+
+    runBtn.disabled = true;
+    setStatus("run", noUpload ? "running…" : "uploading…");
+    consoleEl.textContent = "";
+    consoleEl.classList.add("show");
+    summaryEl.classList.remove("show");
+
+    const fetchOpts = { method: "POST" };
+    if (!noUpload) {
+      const form = new FormData();
+      chosenFiles.forEach(f => form.append("files", f, f.webkitRelativePath || f.name));
+      if (dryRunEl) form.append("dry_run", dryRunEl.checked ? "1" : "0");
+      fetchOpts.body = form;
+    }
+
+    let resp, data, rawText;
+    try {
+      resp = await fetch(endpoint, fetchOpts);
+    } catch (err) {
+      // The request itself never completed (server unreachable, connection
+      // dropped mid-upload, etc).
+      setStatus("error", "error");
+      appendLine(`[ERROR] request failed: ${err}`, "err");
+      runBtn.disabled = noUpload ? false : chosenFiles.length === 0;
+      return;
+    }
+    rawText = await resp.text();
+    if (!rawText){
+      // Empty body regardless of status code -- always worth surfacing
+      // explicitly rather than treating it as "{}" and falling through to
+      // a generic message, since it almost always means the server process
+      // crashed or the connection was cut mid-response.
+      setStatus("error", "error");
+      appendLine(`[ERROR] server returned an empty response (HTTP ${resp.status})`, "err");
+      appendLine("The server process likely crashed or the connection was cut mid-request -- check the terminal running app.py for a traceback (or 'Killed', if it ran out of memory).", "dim");
+      runBtn.disabled = false;
+      return;
+    }
+    try {
+      data = JSON.parse(rawText);
+    } catch (err) {
+      // Valid response, non-JSON body -- e.g. an HTML error page.
+      setStatus("error", "error");
+      appendLine(`[ERROR] server returned an unreadable response (HTTP ${resp.status})`, "err");
+      appendLine(rawText.slice(0, 300), "dim");
+      runBtn.disabled = false;
+      return;
+    }
+    if (!resp.ok){
+      setStatus("error", "error");
+      appendLine(`[ERROR] ${data.error || "request rejected"}`, "err");
+      runBtn.disabled = false;
+      return;
+    }
+
+    setStatus("run", "running…");
+    const source = new EventSource(`/stream/${data.job_id}`);
+    source.onmessage = ev => {
+      const payload = JSON.parse(ev.data);
+      appendLine(payload.line, classify(payload.line));
+    };
+    source.addEventListener("done", ev => {
+      const payload = JSON.parse(ev.data);
+      source.close();
+      runBtn.disabled = false;
+      if (payload.status === "done"){
+        setStatus("done", "done");
+        renderSummary(payload.summary);
+      } else {
+        setStatus("error", "error");
+        appendLine(`[ERROR] ${payload.error || "job failed"}`, "err");
+      }
+    });
+    source.onerror = () => {
+      source.close();
+      runBtn.disabled = false;
+      setStatus("error", "connection lost");
+    };
+  }
+
+  function classify(line){
+    if (line.includes("[WARN]") || line.includes("[WARNING]") || line.includes("WARNING:")) return "warn";
+    if (line.includes("[ERROR]") || line.includes("FAILED") || line.includes("not found on server")) return "err";
+    if (line.includes("[OK]") || line.includes("[REUSE]") || line.startsWith("Done.")
+        || line.includes("-> uploaded") || line.includes("[DRY RUN]")) return "ok";
+    return "dim";
+  }
+
+  function appendLine(text, cls){
+    const span = document.createElement("div");
+    if (cls) span.className = cls;
+    span.textContent = text;
+    consoleEl.appendChild(span);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function setStatus(kind, label){
+    statusEl.className = `status ${kind}`;
+    statusEl.textContent = label;
+  }
+
+  function renderSummary(summary){
+    if (!summary) return;
+    const rows = Object.entries(summary)
+      .filter(([k]) => k !== "duplicates")
+      .map(([k, v]) => `<tr><td>${k.replace(/_/g," ")}</td><td>${v}</td></tr>`)
+      .join("");
+    summaryEl.innerHTML = `<table>${rows}</table>`;
+    summaryEl.classList.add("show");
+  }
+}
+</script>
+</body>
+</html>
