@@ -13,8 +13,8 @@ try:import imagecodecs as _imagecodecs
 except ImportError:_imagecodecs=None
 try:from lxml import etree as _etree
 except ImportError:_etree=None
-INPUT_PATH='C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\test'
-OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\test'
+INPUT_PATH='C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\Image'
+OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\Image'
 load_dotenv()
 POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')

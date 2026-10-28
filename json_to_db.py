@@ -26,7 +26,7 @@ for _pair in os.getenv('SUBJ_IDS', '').split(','):
 SUBJ_ID_MAP = dict(ENV_SUBJ_IDS)
 SUBJECTS_URL = os.getenv('POLY_SUBJECTS_URL', API_URL.rsplit('/', 1)[0] + '/GetAllPracticalSubjects')
 IMG_STYLE = 'max-width: 350px; max-height: 300px; width: auto; height: auto; object-fit: contain; display: block; margin: 8px auto;'
-DEFAULT_FOLDER = 'C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\test'
+DEFAULT_FOLDER = 'C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\Image'
 QUES_TOKEN = os.getenv('ques_TOKEN')
 SAVE_TIMEOUT = (float(os.getenv('SAVE_CONNECT_TIMEOUT', '10')), float(os.getenv('SAVE_READ_TIMEOUT', '180')))
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -253,8 +253,7 @@ def process_node(node, subj_code, qno_path, parent_id, disp_order, session, stat
             print(f"  FAILED {qno_path}: image was not uploaded (placeholder still in text). Re-run doc_to_json.py for this file; re-running this script is safe.")
             return
         content = format_ques_content(description)
-        # The SaveQuestion API does the duplicate check itself (hash + semantic similarity);
-        # this script just sends every question and reports what the server answers.
+      
         payload = build_payload(subj_code, content, parent_id, disp_order)
         ok, new_id, status = post_question(session, payload, dry_run, test_mode)
         is_duplicate = not ok and status.startswith('duplicate')
