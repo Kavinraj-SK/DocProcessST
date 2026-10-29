@@ -26,7 +26,7 @@ for _pair in os.getenv('SUBJ_IDS', '').split(','):
 SUBJ_ID_MAP = dict(ENV_SUBJ_IDS)
 SUBJECTS_URL = os.getenv('POLY_SUBJECTS_URL', API_URL.rsplit('/', 1)[0] + '/GetAllPracticalSubjects')
 IMG_STYLE = 'max-width: 350px; max-height: 300px; width: auto; height: auto; object-fit: contain; display: block; margin: 8px auto;'
-DEFAULT_FOLDER = 'C:\\Users\\Administrator\\Downloads\\zDocProcessor-main\\Image'
+DEFAULT_FOLDER = 'C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\EC'
 QUES_TOKEN = os.getenv('ques_TOKEN')
 SAVE_TIMEOUT = (float(os.getenv('SAVE_CONNECT_TIMEOUT', '10')), float(os.getenv('SAVE_READ_TIMEOUT', '180')))
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
