@@ -13,10 +13,10 @@ try:import imagecodecs as _imagecodecs
 except ImportError:_imagecodecs=None
 try:from lxml import etree as _etree
 except ImportError:_etree=None
-INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\EC'
-OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\EC'
+INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\R2023 Task based Practicum QP Final (170)'
+OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\R2023 Task based Practicum QP Final (170)'
 load_dotenv()
-POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank').rstrip('/')
+POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')
 POLY_REFRESH_URL=os.getenv('POLY_REFRESH_URL',POLY_API_BASE+'/RefreshImageUrls')
 POLY_TOKEN=os.getenv('ques_TOKEN')
