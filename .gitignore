@@ -1,9 +1,8 @@
 .env
-File/
-test/
-Image/
-testAll/
+
 */*
+!/static/
+
 
 upload_log.csv
 bad_subj_codes.json
