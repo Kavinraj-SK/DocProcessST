@@ -1,9 +1,8 @@
 flask
-waitress
 requests
 python-dotenv
 docx2python
 python-docx
-pillow
-imagecodecs
 lxml
+Pillow
+wordninja
