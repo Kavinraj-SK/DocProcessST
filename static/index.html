@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doc Processor</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #1c1d21;
+    --panel: #25262b;
+    --panel-2: #2c2d33;
+    --line: #3a3b43;
+    --text: #eceef6;
+    --muted: #9ea1b1;
+    --red: #e5342f;
+    --red-hi: #ff4a43;
+    --ok: #4cc38a;
+    --warn: #e3a73b;
+    --bad: #ff7b72;
+    --focus: #8fb0ff;
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font: 14px/1.5 var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px 56px; }
+  .muted { color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* top bar */
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0 8px; }
+  header.top h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: .1px; }
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-left: 18px; }
+  .seg button { background: transparent; border: 0; padding: 6px 14px; cursor: pointer; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button:hover { background: var(--panel-2); }
+  .seg button[aria-selected="true"] { background: var(--panel-2); color: var(--text); font-weight: 600; box-shadow: inset 0 -2px 0 var(--red); }
+  .csvmode .col-images { display: none; }
+  header.top .lead { display: flex; align-items: center; flex-wrap: wrap; }
+  .btn {
+    background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 7px 14px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--panel-2); border-color: #52535d; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: var(--red-hi); border-color: var(--red-hi); }
+  .btn.small { padding: 3px 10px; font-size: 13px; }
+  .tokenchip { display: inline-flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+
+  /* progress block, modelled on the reference upload screen */
+  .progress {
+    margin-top: 12px; padding: 36px 24px 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    text-align: center;
+  }
+  .progress h2 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; }
+  .progress .sub { margin: 4px 0 0; font-size: 14px; font-weight: 700; word-break: break-all; }
+  .progress .meta { margin: 20px 0 8px; font-size: 13px; color: var(--muted); }
+  .progress .meta b { color: var(--text); font-weight: 650; }
+  .bar {
+    max-width: 800px; margin: 0 auto; height: 24px; background: #111215; border: 2px solid #55565f; border-radius: 2px; overflow: hidden;
+  }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width .5s ease; }
+  .progress .pct { margin-top: 22px; font-size: 58px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .progress .pct-label { margin-top: 6px; font-size: 26px; font-weight: 300; letter-spacing: .5px; }
+  .progress .note { max-width: 800px; margin: 16px auto 0; font-size: 13px; color: var(--muted); }
+  .progress .note.bad { color: var(--bad); }
+  .progress .actions { margin-top: 18px; min-height: 34px; }
+  .progress.is-error .bar > i { background: var(--bad); }
+
+  /* totals strip */
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 20px; margin: 20px 0 4px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .strip > div { padding: 12px 0; }
+  .strip strong { display: block; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .strip span { color: var(--muted); font-size: 13px; }
+  .strip small { display: block; font-size: 12px; margin-top: 2px; }
+
+  /* toolbar */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin: 20px 0 12px; }
+  .toolbar .group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .field { background: #17181b; border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; min-width: 0; }
+  .field:focus { border-color: var(--focus); outline: none; }
+  .folder-input { width: min(520px, 46vw); }
+  .check { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .check input { width: 16px; height: 16px; accent-color: var(--red); }
+  .check .limit { width: 72px; height: auto; padding: 4px 8px; }
+
+  /* table */
+  .tablewrap { border: 1px solid var(--line); border-radius: 6px; overflow: auto; background: var(--panel); position: relative; }
+  .tablewrap.drag { outline: 2px dashed var(--red); outline-offset: -6px; }
+  table { width: 100%; border-collapse: collapse; min-width: 980px; }
+  th, td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: var(--panel-2); font-weight: 600; font-size: 13px; color: var(--muted); white-space: nowrap; z-index: 1; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: rgba(255,255,255,.025); }
+  tbody tr.selected { background: rgba(229,52,47,.09); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.file strong { font-weight: 600; word-break: break-all; }
+  td.file small { display: block; color: var(--muted); }
+  td input[type=checkbox], th input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--red); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .imgcell .btn { white-space: nowrap; }
+  .chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--line); white-space: nowrap; }
+  .chip.ok { color: var(--ok); border-color: rgba(76,195,138,.45); }
+  .chip.warn { color: var(--warn); border-color: rgba(227,167,59,.45); }
+  .chip.bad { color: var(--bad); border-color: rgba(255,123,114,.45); }
+  .imgcell small { display: block; margin-top: 4px; font-size: 12.5px; }
+  .imgcell small.bad { color: var(--bad); } .imgcell small.ok { color: var(--ok); } .imgcell small.warn { color: var(--warn); }
+  .empty { padding: 44px 20px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 4px; }
+
+  /* log */
+  details.logbox { margin-top: 20px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  details.logbox summary { cursor: pointer; padding: 10px 14px; font-weight: 600; }
+  .log { max-height: 260px; overflow: auto; padding: 0 14px 12px; font-size: 12.5px; line-height: 1.55; }
+  .log div { white-space: pre-wrap; word-break: break-word; border-top: 1px solid rgba(255,255,255,.05); padding: 2px 0; }
+  .log .t { color: var(--muted); margin-right: 8px; }
+  .log .warn { color: var(--warn); } .log .error { color: var(--bad); }
+
+  /* modals */
+  .scrim { position: fixed; inset: 0; background: rgba(8,8,10,.68); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 20; }
+  .scrim.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(1120px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .modal.narrow { width: min(560px, 100%); }
+  .modal header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
+  .modal h3 { margin: 0; font-size: 18px; font-weight: 650; }
+  .modal .body { padding: 16px 20px; overflow: auto; }
+  .modal footer { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .gtools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .path { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; color: var(--muted); word-break: break-all; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .tile { border: 1px solid var(--line); border-radius: 4px; background: var(--ink); overflow: hidden; display: flex; flex-direction: column; }
+  .tile .pic { aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; background: #111215; padding: 6px; }
+  .tile .pic img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .tile .pic .msg { font-size: 12.5px; color: var(--bad); text-align: center; padding: 8px; }
+  .tile .pic .msg.wait { color: var(--muted); }
+  .tile .cap { padding: 8px 10px; font-size: 12.5px; display: grid; gap: 4px; }
+  .tile .cap b { font-weight: 600; word-break: break-all; }
+  .tile .cap .row { display: flex; gap: 8px; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--focus); cursor: pointer; text-decoration: underline; }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .form label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+  .form label.wide { grid-column: 1 / -1; }
+  .form .field { width: 100%; color: var(--text); }
+  .form hr { grid-column: 1 / -1; border: 0; border-top: 1px solid var(--line); width: 100%; margin: 4px 0; }
+  .hint { font-size: 12.5px; color: var(--muted); }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #3a1d1d; border: 1px solid #7a3636; color: #ffd9d6; padding: 10px 16px; border-radius: 6px; z-index: 40; max-width: min(640px, 92vw); display: none; }
+  .toast.show { display: block; }
+  .toast.info { background: #1e2b3a; border-color: #36597a; color: #d6e8ff; }
+
+  @media (max-width: 760px) {
+    .wrap { padding: 0 14px 40px; }
+    .form { grid-template-columns: 1fr; }
+    .progress h2 { font-size: 22px; }
+    .progress .pct { font-size: 46px; }
+    .folder-input { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar > i, .btn { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="lead">
+      <h1>Doc Processor</h1>
+      <div class="seg" id="modeSeg" role="tablist" aria-label="Question source">
+        <button type="button" role="tab" id="modeDocx" data-mode="docx" aria-selected="true">Word documents</button>
+        <button type="button" role="tab" id="modeCsv" data-mode="csv" aria-selected="false">CSV / Excel</button>
+      </div>
+    </div>
+    <div class="top-right">
+      <button class="btn tokenchip" id="tokenBtn" type="button" title="Open settings to change the token"><span class="dot" id="tokenDot"></span><span id="tokenText">Token not set</span></button>
+      <button class="btn" id="settingsBtn" type="button">Settings</button>
+    </div>
+  </header>
+
+  <section class="progress" id="progress" aria-labelledby="pgTitle">
+    <h2 id="pgTitle">Ready</h2>
+    <p class="sub" id="pgSub"></p>
+    <p class="meta" id="pgMeta" aria-live="polite"></p>
+    <div class="bar" id="pgBar" role="progressbar" aria-label="Files processed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="pgFill"></i></div>
+    <div class="pct" id="pgPct">0%</div>
+    <div class="pct-label" id="pgLabel">PROCESSED</div>
+    <p class="note" id="pgNote"></p>
+    <div class="actions"><button class="btn" id="stopBtn" type="button" hidden>Stop after this file</button></div>
+  </section>
+
+  <div class="strip" id="strip" aria-label="Totals for the folder"></div>
+
+  <div class="toolbar">
+    <div class="group">
+      <label class="sr" for="folderInput">Working folder</label>
+      <input class="field folder-input" id="folderInput" type="text" readonly placeholder="No folder selected. Use Select folder.">
+      <button class="btn" id="uploadBtn" type="button">Select folder</button>
+      <input id="uploadInput" type="file" accept=".docx" multiple hidden>
+    </div>
+    <div class="group">
+      <label class="check"><input type="checkbox" id="optConvert" checked> Convert to JSON</label>
+      <label class="check"><input type="checkbox" id="optSave" checked> Save to question bank</label>
+      <label class="check" title="Runs the save step without sending anything to SaveQuestion"><input type="checkbox" id="optDry"> Dry run</label>
+      <label class="check">First <input class="field limit" id="optLimit" type="number" min="1" placeholder="all"> files</label>
+      <button class="btn" id="allImagesBtn" type="button">All images</button>
+      <button class="btn primary" id="runBtn" type="button">Run ingestion</button>
+    </div>
+  </div>
+
+  <div class="tablewrap" id="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="selAll" aria-label="Select all files"></th>
+          <th>File</th>
+          <th>Subject</th>
+          <th class="num">Questions</th>
+          <th class="col-images">Images in S3</th>
+          <th>Converted</th>
+          <th>Question bank</th>
+          <th>Updated</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden></div>
+  </div>
+
+  <details class="logbox" id="logbox">
+    <summary>Activity log <span class="muted" id="logCount"></span></summary>
+    <div class="log" id="logBody"></div>
+  </details>
+</div>
+
+<!-- image gallery -->
+<div class="scrim" id="galleryScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="gTitle">
+    <header>
+      <div>
+        <h3 id="gTitle">Images</h3>
+        <div class="path" id="gFolders"></div>
+      </div>
+      <button class="btn small" id="gClose" type="button">Close</button>
+    </header>
+    <div class="body">
+      <div class="gtools">
+        <label class="sr" for="gFilter">Show</label>
+        <select class="field" id="gFilter">
+          <option value="all">All images</option>
+          <option value="bad">Not loading</option>
+        </select>
+        <button class="btn small" id="gCheck" type="button">Check every image</button>
+        <span class="hint" id="gStatus"></span>
+      </div>
+      <div class="grid" id="gGrid"></div>
+    </div>
+    <footer>
+      <span class="hint" id="gRange"></span>
+      <span><button class="btn small" id="gPrev" type="button">Previous</button> <button class="btn small" id="gNext" type="button">Next</button></span>
+    </footer>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="scrim" id="settingsScrim">
+  <div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+    <header><h3 id="sTitle">Settings</h3><button class="btn small" id="sClose" type="button">Close</button></header>
+    <div class="body">
+      <div class="form">
+        <label class="wide">Access token
+          <input class="field" id="sToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the token copied from Swagger or the frontend">
+        </label>
+        <label class="check wide"><input type="checkbox" id="sSaveEnv"> Also save the token in the .env file next to the app</label>
+        <div class="wide"><button class="btn" id="sTokenBtn" type="button">Use this token</button> <span class="hint" id="sTokenMsg"></span></div>
+        <hr>
+        <label class="wide">SaveQuestion URL
+          <input class="field" id="sApi" type="text" spellcheck="false">
+        </label>
+        <label>Exam ID<input class="field" id="sExam" type="number"></label>
+        <label>Question bank config ID<input class="field" id="sQb" type="number"></label>
+        <label>Mark per question<input class="field" id="sMark" type="number" step="0.5"></label>
+        <label>Question type ID<input class="field" id="sType" type="number"></label>
+        <label>Pause between saves (seconds)<input class="field" id="sDelay" type="number" step="0.1" min="0"></label>
+        <label class="wide">Subject ids (optional override)
+          <textarea class="field" id="sSubj" rows="2" spellcheck="false" placeholder="MA232431=2827, SU232460=1234"></textarea>
+          <span class="hint">The app already loads the subject list from the server. List only codes it doesn't know.</span>
+        </label>
+      </div>
+    </div>
+    <footer><span class="hint" id="sMsg"></span><button class="btn primary" id="sSave" type="button">Save settings</button></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function api(path, opts = {}) {
+    const init = { method: opts.method || 'GET', headers: {} };
+    if (opts.body instanceof FormData) init.body = opts.body;
+    else if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
+    const r = await fetch(path, init);
+    let data = null;
+    try { data = await r.json(); } catch (e) { /* not JSON */ }
+    if (!r.ok) throw new Error((data && data.error) || r.statusText || 'Request failed');
+    return data;
+  }
+
+  let toastTimer;
+  function toast(msg, kind = 'error') {
+    const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + (kind === 'info' ? 'info' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 6500);
+  }
+
+  const S = { mode: 'docx', rows: [], totals: {}, folder: '', job: { status: 'idle' }, selected: new Set(), token: {}, settings: {}, tick: 0, running: false, logLast: 0 };
+
+  /* ---------- formatting ---------- */
+  function duration(sec) {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return '< 1 MINUTE';
+    const m = Math.round(sec / 60);
+    if (m < 60) return m + (m === 1 ? ' MINUTE' : ' MINUTES');
+    return Math.floor(m / 60) + ' HR ' + (m % 60) + ' MIN';
+  }
+  function elapsed(sec) {
+    sec = Math.max(0, Math.round(sec));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m ? `${m} min ${s} s` : `${s} s`;
+  }
+  const when = ts => ts ? new Date(ts * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
+  /* ---------- progress block ---------- */
+  function renderProgress() {
+    const j = S.job, t = S.totals;
+    let title = 'Ready', sub = '', meta = '', note = '', pct = 0, error = false;
+    if (j.status === 'running') {
+      title = `Processing file ${j.index} of ${j.total_files}`;
+      sub = j.current + (j.current_size ? ` (${j.current_size})` : '');
+      const left = j.steps_done > 0 ? duration(j.eta_seconds) : 'CALCULATING';
+      meta = `<b>Step</b> ${esc(j.stage || '')} - <b>Time left</b> ${left} - <b>Speed</b> ${String(j.files_per_min || 0).toUpperCase()} FILES/MIN`;
+      pct = j.percent;
+    } else if (j.status === 'done') {
+      title = `Processed ${j.files_done} of ${j.total_files} files`;
+      sub = `Finished in ${elapsed((j.finished || 0) - (j.started || 0))}`;
+      meta = 'The table below shows what happened to each file.';
+      pct = 100; note = (j.notes || []).join(' ');
+    } else if (j.status === 'cancelled' || j.status === 'error') {
+      error = j.status === 'error';
+      title = `Stopped after ${j.files_done} of ${j.total_files} files`;
+      sub = j.message || '';
+      meta = 'The files that were finished are kept. Run again to continue.';
+      pct = j.percent; note = (j.notes || []).join(' ');
+    } else {
+      sub = S.folder ? `${t.files || 0} ${t.files === 1 ? 'file' : 'files'} in ${S.folder}` : 'No folder chosen yet';
+      meta = 'Choose the steps below, then select Run ingestion.';
+    }
+    $('#pgTitle').textContent = title;
+    $('#pgSub').textContent = sub;
+    $('#pgMeta').innerHTML = meta;
+    $('#pgFill').style.width = Math.min(100, pct) + '%';
+    const bar = $('#pgBar'); bar.setAttribute('aria-valuenow', Math.floor(pct)); bar.setAttribute('aria-valuetext', `${Math.floor(pct)} percent of files processed`);
+    $('#pgPct').textContent = Math.floor(pct) + '%';
+    const n = $('#pgNote'); n.textContent = note; n.className = 'note' + (error ? ' bad' : '');
+    $('#progress').classList.toggle('is-error', error);
+    $('#stopBtn').hidden = j.status !== 'running';
+    $('#runBtn').disabled = j.status === 'running';
+    document.title = j.status === 'running' ? `${Math.floor(pct)}% - Doc Processor` : 'Doc Processor';
+  }
+
+  /* ---------- totals ---------- */
+  function renderStrip() {
+    const t = S.totals;
+    const checked = (t.images_ok || 0) + (t.images_missing || 0) > 0;
+    const imgSub = checked ? `<small class="${t.images_missing ? 'bad' : 'ok'}" style="color:var(${t.images_missing ? '--bad' : '--ok'})">${t.images_ok || 0} load, ${t.images_missing || 0} do not</small>` : '<small class="muted">not checked yet</small>';
+    const cell = (n, label, extra = '') => `<div><strong>${(n || 0).toLocaleString()}</strong><span>${label}</span>${extra}</div>`;
+    $('#strip').innerHTML = cell(t.files, 'Files in folder') + cell(t.converted, 'Converted to JSON') + cell(t.questions, 'Questions ready')
+      + cell(t.saved, 'Saved') + cell(t.duplicates, 'Duplicates found') + cell(t.errors, 'Failed') + (S.mode === 'csv' ? '' : cell(t.images, 'Images in S3', imgSub));
+  }
+
+  /* ---------- table ---------- */
+  const chip = (tone, text) => `<span class="chip ${tone}">${esc(text)}</span>`;
+
+  function convertCell(r) {
+    const c = (r.state || {}).convert, info = r.info;
+    let main;
+    if (c && c.status === 'ok') main = chip('ok', 'Converted');
+    else if (c && c.status === 'no-questions') main = chip('warn', 'No questions found');
+    else if (c && c.status === 'error') main = chip('bad', 'Failed');
+    else if (r.has_json) main = '<span class="muted">JSON on disk</span>';
+    else main = '<span class="muted">Not converted</span>';
+    const extra = info && info.flags ? `<small class="muted" style="display:block">${info.flags} to review</small>` : '';
+    return main + extra;
+  }
+
+  function saveCell(r) {
+    const s = (r.state || {}).save;
+    if (!s) return '<span class="muted">Not saved</span>';
+    if (s.skipped) return chip('warn', 'Skipped: ' + s.skipped);
+    const out = [];
+    out.push(s.dry_run ? chip('warn', `${s.saved} would save (dry run)`) : chip(s.saved ? 'ok' : 'warn', `${s.saved} saved`));
+    if (s.duplicate) out.push(chip('warn', `${s.duplicate} duplicate`));
+    if (s.error) out.push(chip('bad', `${s.error} failed`));
+    if (s.subject_missing) out.push(chip('bad', 'subject not found'));
+    return `<div class="chips">${out.join('')}</div>`;
+  }
+
+  function imagesCell(r) {
+    const info = r.info; if (!info || info.error) return '<span class="muted">-</span>';
+    const up = info.images_uploaded, pend = info.placeholders;
+    const chk = (r.state || {}).images;
+    let html = up ? `<button class="btn small" type="button" data-act="images" data-stem="${esc(r.stem)}">${up} ${up === 1 ? 'image' : 'images'}</button>` : '<span class="muted">None</span>';
+    if (chk && up) html += chk.missing ? `<small class="bad">${chk.missing} not loading</small>` : '<small class="ok">All load</small>';
+    if (pend) html += `<small class="warn">${pend} still waiting for upload</small>`;
+    return `<div class="imgcell">${html}</div>`;
+  }
+
+  function renderRows() {
+    const body = $('#rows');
+    const rows = S.rows;
+    $('#empty').hidden = rows.length > 0;
+    if (!rows.length) {
+      $('#empty').innerHTML = !S.folder
+        ? `<strong>Choose a folder</strong>Select the folder that holds your ${S.mode === 'csv' ? 'CSV and Excel (.csv, .xlsx)' : '.docx'} files.`
+        : S.folderExists === false
+        ? `<strong>This folder was not found</strong>Select the folder again.`
+        : `<strong>No ${S.mode === 'csv' ? '.csv or .xlsx' : '.docx'} files here yet</strong>Drop files onto this table, or copy them into ${esc(S.folder)}.`;
+    }
+    body.innerHTML = rows.map(r => {
+      const info = r.info && !r.info.error ? r.info : null;
+      const sel = S.selected.has(r.stem);
+      return `<tr class="${sel ? 'selected' : ''}">
+        <td><input type="checkbox" data-act="sel" data-stem="${esc(r.stem)}" ${sel ? 'checked' : ''} aria-label="Select ${esc(r.stem)}"></td>
+        <td class="file"><strong>${esc(r.docx || r.stem + '.json')}</strong>${r.size ? `<small>${esc(r.size)}</small>` : ''}</td>
+        <td>${info ? esc(info.subj_code) : '<span class="muted">-</span>'}</td>
+        <td class="num">${info ? info.questions : '<span class="muted">-</span>'}</td>
+        <td class="col-images">${imagesCell(r)}</td>
+        <td>${convertCell(r)}</td>
+        <td>${saveCell(r)}</td>
+        <td class="muted">${r.updated ? esc(when(r.updated)) : ''}</td>
+        <td><button class="btn small" type="button" data-act="run" data-stem="${esc(r.stem)}" ${S.running ? 'disabled' : ''}>Run</button></td>
+      </tr>`;
+    }).join('');
+    const all = $('#selAll'); all.checked = rows.length > 0 && rows.every(r => S.selected.has(r.stem));
+    $('#runBtn').textContent = S.selected.size ? `Run selected (${S.selected.size})` : 'Run ingestion';
+  }
+
+  async function refreshRows() {
+    try {
+      const d = await api('/api/rows');
+      S.rows = d.rows; S.totals = d.totals; S.folder = d.folder; S.folderExists = d.folder_exists;
+      const stems = new Set(d.rows.map(r => r.stem));
+      [...S.selected].forEach(s => { if (!stems.has(s)) S.selected.delete(s); });
+      if (document.activeElement !== $('#folderInput')) $('#folderInput').value = d.folder;
+      renderRows(); renderStrip(); renderProgress();
+    } catch (e) { /* server may be restarting */ }
+  }
+
+  /* ---------- job polling ---------- */
+  async function tick() {
+    try {
+      const j = await api('/api/job');
+      const was = S.running;
+      S.job = j; S.running = j.status === 'running';
+      renderProgress();
+      S.tick++;
+      if (S.running || was || S.tick % 5 === 0) { if (S.running && S.tick % 2 === 0 || !S.running) await refreshRows(); }
+      if (S.running || was || $('#logbox').open) refreshLog();
+      if (was && !S.running) { renderRows(); loadToken(); }
+    } catch (e) { /* ignore */ }
+    setTimeout(tick, S.running ? 800 : 2500);
+  }
+
+  async function refreshLog() {
+    try {
+      const d = await api('/api/log?since=' + S.logLast);
+      if (!d.lines.length) return;
+      const box = $('#logBody'), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 24;
+      d.lines.forEach(l => {
+        const div = document.createElement('div'); div.className = l.level;
+        const t = document.createElement('span'); t.className = 't'; t.textContent = l.t;
+        div.append(t, document.createTextNode(l.msg));
+        box.appendChild(div);
+      });
+      while (box.children.length > 600) box.removeChild(box.firstChild);
+      S.logLast = d.last; $('#logCount').textContent = `(${box.children.length} lines)`;
+      if (atEnd) box.scrollTop = box.scrollHeight;
+    } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- actions ---------- */
+  async function run(stems) {
+    const convert = $('#optConvert').checked, save = $('#optSave').checked, dry = $('#optDry').checked;
+    const limit = $('#optLimit').value ? parseInt($('#optLimit').value, 10) : null;
+    const target = stems || (S.selected.size ? [...S.selected] : null);
+    const count = target ? target.length : S.rows.length;
+    if (save && !dry && !confirm(`Save ${count} ${count === 1 ? 'file' : 'files'} to the question bank? Duplicates are rejected by the server.`)) return;
+    try {
+      await api('/api/run', { method: 'POST', body: { stems: target, convert, save, dry_run: dry, limit } });
+      S.running = true; S.job = { ...S.job, status: 'running', index: 0, total_files: count, percent: 0, steps_done: 0 };
+      renderProgress(); renderRows();
+    } catch (e) { toast(e.message); }
+  }
+
+  async function uploadFiles(fileList) {
+    const ok = S.mode === 'csv' ? ['.csv', '.xlsx'] : ['.docx'];
+    const files = [...fileList].filter(f => ok.some(x => f.name.toLowerCase().endsWith(x)));
+    if (!files.length) { toast(S.mode === 'csv' ? 'Only .csv and .xlsx files can be added.' : 'Only .docx files can be added.'); return; }
+    const fd = new FormData(); files.forEach(f => fd.append('files', f));
+    try {
+      const r = await api('/api/upload', { method: 'POST', body: fd });
+      toast(`Added ${r.saved.length} ${r.saved.length === 1 ? 'file' : 'files'} to the folder.`, 'info');
+      refreshRows();
+    } catch (e) { toast(e.message); }
+  }
+
+  /* ---------- token and settings ---------- */
+  function renderToken() {
+    const t = S.token, dot = $('#tokenDot'), txt = $('#tokenText');
+    dot.className = 'dot';
+    if (!t.present) { dot.classList.add('bad'); txt.textContent = 'Token not set'; return; }
+    if (t.seconds_left === null || t.seconds_left === undefined) { dot.classList.add('warn'); txt.textContent = 'Token set (expiry unknown)'; return; }
+    if (t.seconds_left <= 0) { dot.classList.add('bad'); txt.textContent = 'Token expired'; return; }
+    const m = Math.floor(t.seconds_left / 60), h = Math.floor(m / 60);
+    dot.classList.add(m < 30 ? 'warn' : 'ok');
+    txt.textContent = h ? `Token valid for ${h} h ${m % 60} min` : `Token valid for ${m} min`;
+  }
+  async function loadToken() { try { S.token = (await api('/api/token')).token; renderToken(); } catch (e) {} }
+  setInterval(() => { if (S.token && S.token.seconds_left != null) { S.token.seconds_left -= 30; renderToken(); } }, 30000);
+
+  async function loadSettings() {
+    const d = await api('/api/settings'); S.settings = d.settings; S.token = d.token; renderToken();
+    S.mode = d.settings.mode === 'csv' ? 'csv' : 'docx';
+    applyMode();
+  }
+  const folderKey = () => S.mode === 'csv' ? 'csv_folder' : 'folder';
+  function applyMode() {
+    const csv = S.mode === 'csv';
+    document.body.classList.toggle('csvmode', csv);
+    $('#modeDocx').setAttribute('aria-selected', String(!csv)); $('#modeCsv').setAttribute('aria-selected', String(csv));
+    $('#folderInput').value = (S.settings && S.settings[folderKey()]) || '';
+    $('#folderInput').placeholder = csv ? 'No CSV folder selected. Use Select folder.' : 'No folder selected. Use Select folder.';
+    $('#allImagesBtn').hidden = csv;
+    $('#uploadInput').accept = csv ? '.csv,.xlsx' : '.docx';
+    $('#pgSub').title = '';
+  }
+  function openSettings() {
+    const s = S.settings;
+    $('#sApi').value = s.api_url; $('#sExam').value = s.exam_id; $('#sQb').value = s.qb_config_id; $('#sMark').value = s.mark;
+    $('#sType').value = s.ques_type_id; $('#sDelay').value = s.delay; $('#sSubj').value = s.subj_ids || '';
+    $('#sToken').value = ''; $('#sTokenMsg').textContent = ''; $('#sMsg').textContent = '';
+    openModal('#settingsScrim', '#sToken');
+  }
+  async function saveFolder() {
+    const d = await api('/api/settings', { method: 'POST', body: { [folderKey()]: $('#folderInput').value } });
+    S.settings = d.settings; return d;
+  }
+  async function saveSettings(extra = {}) {
+    const body = { api_url: $('#sApi').value, exam_id: $('#sExam').value, qb_config_id: $('#sQb').value, mark: $('#sMark').value,
+                   ques_type_id: $('#sType').value, delay: $('#sDelay').value, subj_ids: $('#sSubj').value, [folderKey()]: $('#folderInput').value, ...extra };
+    const d = await api('/api/settings', { method: 'POST', body });
+    S.settings = d.settings; return d;
+  }
+
+  /* ---------- modals ---------- */
+  let lastFocus = null;
+  function openModal(sel, focusSel) { lastFocus = document.activeElement; $(sel).classList.add('open'); const f = focusSel && $(focusSel); if (f) f.focus(); }
+  function closeModal(sel) { $(sel).classList.remove('open'); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+
+  /* ---------- gallery ---------- */
+  const G = { stem: null, items: [], urls: {}, bad: new Set(), page: 0, per: 40, filter: 'all' };
+  const visible = () => G.filter === 'bad' ? G.items.filter(i => G.bad.has(i.filePath) || G.urls[i.filePath] === null) : G.items;
+
+  async function openGallery(stem) {
+    G.stem = stem; G.page = 0; G.urls = {}; G.bad = new Set(); G.filter = 'all'; $('#gFilter').value = 'all';
+    $('#gTitle').textContent = stem ? `Images in ${stem}` : 'All images in this folder';
+    $('#gGrid').innerHTML = ''; $('#gStatus').textContent = 'Loading the list'; $('#gFolders').textContent = '';
+    openModal('#galleryScrim', '#gClose');
+    try {
+      const d = await api('/api/images' + (stem ? '?stem=' + encodeURIComponent(stem) : ''));
+      G.items = d.items;
+      $('#gFolders').textContent = d.folders.length ? 'S3 folder: ' + d.folders.join(', ') : '';
+      $('#gStatus').textContent = d.items.length ? '' : 'No uploaded images in these files.';
+      await loadPage();
+    } catch (e) { $('#gStatus').textContent = e.message; }
+  }
+
+  async function loadPage() {
+    const list = visible(), start = G.page * G.per, slice = list.slice(start, start + G.per);
+    renderGrid(slice, list.length);
+    const need = slice.map(i => i.filePath).filter(p => !(p in G.urls));
+    if (need.length) {
+      try {
+        const r = await api('/api/images/refresh', { method: 'POST', body: { paths: need } });
+        Object.assign(G.urls, r.urls);
+        if (r.error) toast(r.error);
+      } catch (e) { need.forEach(p => { G.urls[p] = null; }); toast(e.message); }
+      renderGrid(slice, list.length);
+    }
+  }
+
+  function renderGrid(slice, total) {
+    $('#gGrid').innerHTML = slice.map(i => {
+      const u = G.urls[i.filePath];
+      let pic;
+      if (!(i.filePath in G.urls)) pic = '<div class="msg wait">Getting a link</div>';
+      else if (!u) pic = '<div class="msg">The server gave no link. The file may be missing, or this user cannot open it.</div>';
+      else pic = `<img src="${esc(u)}" alt="${esc(i.fileName)}" loading="lazy" data-path="${esc(i.filePath)}">`;
+      return `<div class="tile"><div class="pic">${pic}</div><div class="cap"><b>${esc(i.fileName)}</b>${G.stem ? '' : `<span class="muted">${esc(i.stem)}</span>`}
+        <span class="path">${esc(i.filePath)}</span>
+        <span class="row">${u ? `<a class="linkbtn" href="${esc(u)}" target="_blank" rel="noopener">Open</a>` : ''}<button class="linkbtn" type="button" data-copy="${esc(i.filePath)}">Copy path</button></span></div></div>`;
+    }).join('');
+    const from = total ? G.page * G.per + 1 : 0, to = Math.min(total, (G.page + 1) * G.per);
+    $('#gRange').textContent = total ? `Showing ${from} to ${to} of ${total}` : (G.filter === 'bad' ? 'Every checked image loads.' : '');
+    $('#gPrev').disabled = G.page === 0; $('#gNext').disabled = to >= total;
+    $('#gGrid').querySelectorAll('img').forEach(img => img.addEventListener('error', () => {
+      const p = img.dataset.path; G.bad.add(p);
+      img.parentElement.innerHTML = '<div class="msg">The link did not open. It may have expired. Check the image again.</div>';
+    }, { once: true }));
+  }
+
+  async function checkAll() {
+    $('#gCheck').disabled = true; $('#gStatus').textContent = 'Checking every image, this can take a while';
+    try {
+      const r = await api('/api/images/check', { method: 'POST', body: { stem: G.stem } });
+      G.bad = new Set(r.missing_paths || []);
+      (r.missing_paths || []).forEach(p => { G.urls[p] = null; });
+      $('#gStatus').textContent = `${r.ok} load, ${r.missing} do not` + (r.error ? '. ' + r.error : '');
+      await loadPage(); refreshRows();
+    } catch (e) { $('#gStatus').textContent = e.message; }
+    $('#gCheck').disabled = false;
+  }
+
+  /* ---------- wiring ---------- */
+  $('#rows').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const stem = b.dataset.stem;
+    if (b.dataset.act === 'images') openGallery(stem);
+    else if (b.dataset.act === 'run') run([stem]);
+  });
+  $('#rows').addEventListener('change', e => {
+    const b = e.target.closest('[data-act="sel"]'); if (!b) return;
+    b.checked ? S.selected.add(b.dataset.stem) : S.selected.delete(b.dataset.stem); renderRows();
+  });
+  $('#selAll').addEventListener('change', e => { S.rows.forEach(r => e.target.checked ? S.selected.add(r.stem) : S.selected.delete(r.stem)); renderRows(); });
+  $('#runBtn').addEventListener('click', () => run());
+  $('#stopBtn').addEventListener('click', async () => { try { await api('/api/stop', { method: 'POST' }); toast('Stopping after the current file.', 'info'); } catch (e) { toast(e.message); } });
+  $('#allImagesBtn').addEventListener('click', () => openGallery(null));
+  $('#uploadBtn').addEventListener('click', async () => {
+    try {
+      const r = await api('/api/pick-folder', { method: 'POST' });
+      if (!r.folder) return;
+      $('#folderInput').value = r.folder;
+      await saveFolder(); S.selected.clear(); await refreshRows();
+    } catch (e) { toast(e.message); }
+  });
+  $('#folderInput').addEventListener('click', () => $('#uploadBtn').click());
+  $('#uploadInput').addEventListener('change', e => { uploadFiles(e.target.files); e.target.value = ''; });
+  const tw = $('#tablewrap');
+  ['dragenter', 'dragover'].forEach(ev => tw.addEventListener(ev, e => { e.preventDefault(); tw.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => tw.addEventListener(ev, e => { e.preventDefault(); tw.classList.remove('drag'); }));
+  tw.addEventListener('drop', e => uploadFiles(e.dataTransfer.files));
+
+  $('#modeSeg').addEventListener('click', async e => {
+    const b = e.target.closest('[data-mode]'); if (!b || b.dataset.mode === S.mode) return;
+    try {
+      const r = await api('/api/mode', { method: 'POST', body: { mode: b.dataset.mode } });
+      S.settings = r.settings; S.mode = b.dataset.mode; S.selected.clear(); S.rows = []; S.totals = {}; applyMode(); await refreshRows();
+    } catch (err) { toast(err.message); }
+  });
+  $('#settingsBtn').addEventListener('click', openSettings);
+  $('#tokenBtn').addEventListener('click', openSettings);
+  $('#sClose').addEventListener('click', () => closeModal('#settingsScrim'));
+  $('#sTokenBtn').addEventListener('click', async () => {
+    const msg = $('#sTokenMsg');
+    try {
+      const r = await api('/api/token', { method: 'POST', body: { token: $('#sToken').value, save_env: $('#sSaveEnv').checked } });
+      S.token = r.token; renderToken(); $('#sToken').value = '';
+      msg.textContent = r.token.present ? (r.token.seconds_left == null ? 'Token updated.' : 'Token updated, it expires in ' + Math.floor(r.token.seconds_left / 60) + ' minutes.') : 'Token cleared.';
+    } catch (e) { msg.textContent = e.message; }
+  });
+  $('#sSave').addEventListener('click', async () => {
+    try { await saveSettings(); $('#sMsg').textContent = 'Saved.'; refreshRows(); } catch (e) { $('#sMsg').textContent = e.message; }
+  });
+
+  $('#gClose').addEventListener('click', () => closeModal('#galleryScrim'));
+  $('#gPrev').addEventListener('click', () => { G.page = Math.max(0, G.page - 1); loadPage(); });
+  $('#gNext').addEventListener('click', () => { G.page++; loadPage(); });
+  $('#gFilter').addEventListener('change', e => { G.filter = e.target.value; G.page = 0; loadPage(); });
+  $('#gCheck').addEventListener('click', checkAll);
+  $('#gGrid').addEventListener('click', async e => {
+    const b = e.target.closest('[data-copy]'); if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.copy); toast('Path copied.', 'info'); } catch (err) { toast(b.dataset.copy, 'info'); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    ['#galleryScrim', '#settingsScrim'].forEach(s => { if ($(s).classList.contains('open')) closeModal(s); });
+  });
+  ['#galleryScrim', '#settingsScrim'].forEach(s => $(s).addEventListener('mousedown', e => { if (e.target === $(s)) closeModal(s); }));
+  $('#logbox').addEventListener('toggle', () => { if ($('#logbox').open) refreshLog(); });
+
+  (async () => { try { await loadSettings(); } catch (e) {} await refreshRows(); renderProgress(); tick(); })();
+})();
+</script>
+</body>
+</html>
