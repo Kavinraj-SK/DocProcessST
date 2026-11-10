@@ -139,7 +139,6 @@ def build_payload(subj_code, content_html, parent_id, disp_order):
         'stepMarks': [],
     }
 
-
 def extract_new_id(response_json):
     if response_json is None:
         return None

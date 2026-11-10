@@ -13,8 +13,8 @@ try:import imagecodecs as _imagecodecs
 except ImportError:_imagecodecs=None
 try:from lxml import etree as _etree
 except ImportError:_etree=None
-INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\Image'
-OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\Image'
+INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test2'
+OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test2'
 load_dotenv()
 POLY_API_BASE=os.getenv('POLY_API_BASE','https://campus.psgtech.ac.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')
