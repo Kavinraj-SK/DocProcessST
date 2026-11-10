@@ -1,10 +1,3 @@
-"""Doc Processor: local web front end for doc_to_json.py and json_to_db.py.
-
-Run it next to the two scripts:   python app.py     (then open http://127.0.0.1:5055)
-
-It does not change how the scripts work. It calls their own functions one file at a time,
-so it can show "file k of N", and it asks RefreshImageUrls for fresh links to show the images.
-"""
 import base64
 import json
 import os
@@ -44,7 +37,7 @@ DEFAULT_SETTINGS = {
     'qb_config_id': j.QB_CONFIG_ID,
     'mark': j.QUESTION_MARK,
     'ques_type_id': j.QUES_TYPE_ID,
-    'delay': 0.6,
+    'delay': 0.2,
     'subj_ids': os.getenv('SUBJ_IDS', ''),
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
@@ -133,7 +126,6 @@ def current_mode():
 
 
 def folder_path():
-    """The folder chosen in the front end for the current mode, or None while none is chosen."""
     raw = str(SETTINGS.get('csv_folder' if current_mode() == 'csv' else 'folder') or '').strip().strip('"')
     return Path(raw) if raw else None
 
@@ -166,7 +158,6 @@ def persist_state():
 
 
 def scan(folder):
-    """{stem: {'docx': Path|None, 'json': Path|None}} for the working folder."""
     files = {}
     if not folder.is_dir():
         return files

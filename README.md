@@ -8,6 +8,10 @@ pip install -r requirements.txt
 
 `ques_TOKEN`
 
+## 3. Check for API_URL (POLY/CAMPUS)
 
-## 3. Run it
+doc_to_json.py
+.env
+
+## 4. Run it
 python app.py

@@ -154,7 +154,6 @@ def extract_new_id(response_json):
                     return val
     return None
 
-
 TAG_RE = re.compile(r'<[^>]+>')
 
 
