@@ -16,7 +16,7 @@ except ImportError:_etree=None
 INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
 OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
 load_dotenv()
-POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
+POLY_API_BASE=os.getenv('POLY_API_BASE','https://campus.psgtech.ac.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')
 POLY_REFRESH_URL=os.getenv('POLY_REFRESH_URL',POLY_API_BASE+'/RefreshImageUrls')
 POLY_TOKEN=os.getenv('ques_TOKEN')
