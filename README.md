@@ -11,6 +11,7 @@ pip install -r requirements.txt
 ## 3. Check for API_URL (POLY/CAMPUS)
 
 doc_to_json.py
+
 .env
 
 ## 4. Run it
