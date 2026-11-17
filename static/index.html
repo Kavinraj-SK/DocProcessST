@@ -280,7 +280,7 @@
         <label class="wide">Access token
           <input class="field" id="sToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the token copied from Swagger or the frontend">
         </label>
-        <label class="check wide"><input type="checkbox" id="sSaveEnv"> Also save the token in the .env file next to the app</label>
+        <p class="hint wide">The token is saved in the .env file next to the app as both ques_TOKEN and AUTH_TOKEN, so your scripts and the next run use it too.</p>
         <div class="wide"><button class="btn" id="sTokenBtn" type="button">Use this token</button> <span class="hint" id="sTokenMsg"></span></div>
         <hr>
         <label class="wide">SaveQuestion URL
@@ -686,9 +686,10 @@
   $('#sTokenBtn').addEventListener('click', async () => {
     const msg = $('#sTokenMsg');
     try {
-      const r = await api('/api/token', { method: 'POST', body: { token: $('#sToken').value, save_env: $('#sSaveEnv').checked } });
+      const r = await api('/api/token', { method: 'POST', body: { token: $('#sToken').value } });
       S.token = r.token; renderToken(); $('#sToken').value = '';
-      msg.textContent = r.token.present ? (r.token.seconds_left == null ? 'Token updated.' : 'Token updated, it expires in ' + Math.floor(r.token.seconds_left / 60) + ' minutes.') : 'Token cleared.';
+      const saved = r.env && r.env.saved ? ' Saved to .env.' : (r.env ? ' Could not write .env (' + r.env.error + ').' : '');
+      msg.textContent = (r.token.present ? (r.token.seconds_left == null ? 'Token updated.' : 'Token updated, it expires in ' + Math.floor(r.token.seconds_left / 60) + ' minutes.') : 'Token cleared.') + saved;
     } catch (e) { msg.textContent = e.message; }
   });
   $('#sSave').addEventListener('click', async () => {

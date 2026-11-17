@@ -1,3 +1,10 @@
+"""Doc Processor: local web front end for doc_to_json.py and json_to_db.py.
+
+Run it next to the two scripts:   python app.py     (then open http://127.0.0.1:5055)
+
+It does not change how the scripts work. It calls their own functions one file at a time,
+so it can show "file k of N", and it asks RefreshImageUrls for fresh links to show the images.
+"""
 import base64
 import json
 import os
@@ -37,7 +44,7 @@ DEFAULT_SETTINGS = {
     'qb_config_id': j.QB_CONFIG_ID,
     'mark': j.QUESTION_MARK,
     'ques_type_id': j.QUES_TYPE_ID,
-    'delay': 0.2,
+    'delay': 0.6,
     'subj_ids': os.getenv('SUBJ_IDS', ''),
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
@@ -47,7 +54,80 @@ if SETTINGS_PATH.exists():
     except Exception:
         pass
 
-TOKEN = {'value': os.getenv('ques_TOKEN') or ''}
+TOKEN = {'value': os.getenv('ques_TOKEN') or os.getenv('AUTH_TOKEN') or ''}
+
+# ----------------------------------------------------------------------------- token <-> .env
+# The token lives in two places that are kept the same: the .env file next to the app (the
+# permanent copy, also read by doc_to_json.py and json_to_db.py when run on their own) and
+# the running app. Saving a token on the page writes it to .env; editing .env by hand is
+# picked up by the running app the next time it checks the token.
+ENV_PATH = HERE / '.env'
+ENV_KEYS = ('ques_TOKEN', 'AUTH_TOKEN')      # ques_TOKEN: the Word route. AUTH_TOKEN: your CSV uploader script.
+ENV_KEY = ENV_KEYS[0]
+ENV_SEEN = {'mtime': None}
+
+
+def write_env_values(values):
+    """Set key=value pairs in .env (file created if missing), keeping every other line. Returns an error text or None."""
+    try:
+        raw = ENV_PATH.read_bytes().decode('utf-8-sig') if ENV_PATH.exists() else ''
+        newline = '\r\n' if '\r\n' in raw else '\n'
+        lines = raw.splitlines()
+        for key, value in values.items():
+            pattern = re.compile(r'^\s*(?:export\s+)?' + re.escape(key) + r'\s*=')
+            shown = f'"{value}"' if re.search(r'[\s#"\']', value) else value
+            out, done = [], False
+            for line in lines:
+                if pattern.match(line):
+                    if not done:
+                        out.append(f'{key}={shown}')
+                        done = True
+                    continue                  # a second line for the same key would only cause confusion
+                out.append(line)
+            if not done:
+                out.append(f'{key}={shown}')
+            lines = out
+        text = newline.join(lines) + newline
+        tmp = ENV_PATH.with_name('.env.tmp')
+        try:
+            tmp.write_text(text, encoding='utf-8', newline='')
+            os.replace(tmp, ENV_PATH)
+        except OSError:
+            ENV_PATH.write_text(text, encoding='utf-8', newline='')   # e.g. the file is locked for replace
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        ENV_SEEN['mtime'] = ENV_PATH.stat().st_mtime_ns
+        return None
+    except OSError as e:
+        return str(e)
+
+
+def sync_token_from_env():
+    """If .env changed since we last looked (edited by hand, or by another script), take the new token from it
+    and write it to the other token variable too, so both always hold the same token."""
+    try:
+        mtime = ENV_PATH.stat().st_mtime_ns
+    except OSError:
+        return
+    if mtime == ENV_SEEN['mtime']:
+        return
+    ENV_SEEN['mtime'] = mtime
+    try:
+        from dotenv import dotenv_values
+        found = {k: str(dotenv_values(ENV_PATH).get(k) or '').strip() for k in ENV_KEYS}
+    except Exception:
+        return
+    current = TOKEN['value'].strip()
+    changed = [v for k, v in found.items() if v and v != current]      # a variable that differs from what the app holds
+    if changed:
+        TOKEN['value'] = changed[0]                                    # ques_TOKEN wins if both were edited
+        os.environ[ENV_KEY] = os.environ['AUTH_TOKEN'] = changed[0]
+        apply_token()
+        URL_CACHE.clear()
+    if any(found[k] != TOKEN['value'].strip() for k in ENV_KEYS) and TOKEN['value'].strip():
+        write_env_values({k: TOKEN['value'].strip() for k in ENV_KEYS})
 
 
 def _num(value, cast, name):
@@ -89,6 +169,7 @@ def apply_token():
 
 
 def token_info():
+    sync_token_from_env()
     value = TOKEN['value'].strip()
     info = {'present': bool(value), 'exp': None, 'seconds_left': None, 'readable': False}
     if not value:
@@ -126,6 +207,7 @@ def current_mode():
 
 
 def folder_path():
+    """The folder chosen in the front end for the current mode, or None while none is chosen."""
     raw = str(SETTINGS.get('csv_folder' if current_mode() == 'csv' else 'folder') or '').strip().strip('"')
     return Path(raw) if raw else None
 
@@ -158,6 +240,7 @@ def persist_state():
 
 
 def scan(folder):
+    """{stem: {'docx': Path|None, 'json': Path|None}} for the working folder."""
     files = {}
     if not folder.is_dir():
         return files
@@ -425,6 +508,7 @@ def job_update(**kw):
 
 
 def run_job(stems, opts):
+    sync_token_from_env()
     folder = folder_path()
     files = scan(folder)
     do_convert, do_save, dry = opts['convert'], opts['save'], opts['dry_run']
@@ -606,8 +690,14 @@ def collect_images(stems=None):
 
 # ----------------------------------------------------------------------------- routes
 @app.get('/')
+@app.get('/index.html')
 def index():
-    return send_from_directory(str(HERE / 'static'), 'index.html')
+    # index.html belongs in the "static" folder; also accept it sitting next to app.py.
+    for folder in (HERE / 'static', HERE):
+        if (folder / 'index.html').is_file():
+            return send_from_directory(str(folder), 'index.html')
+    return ('index.html was not found. Put it in a folder named "static" next to app.py '
+            f'(expected: {HERE / "static" / "index.html"}).'), 404
 
 
 @app.get('/api/settings')
@@ -652,14 +742,12 @@ def api_set_token():
     if token.lower().startswith('bearer '):
         token = token[7:].strip()
     TOKEN['value'] = token
+    for key in ENV_KEYS:
+        os.environ[key] = token
     apply_token()
     URL_CACHE.clear()
-    if body.get('save_env'):
-        env_path = HERE / '.env'
-        lines = env_path.read_text(encoding='utf-8').splitlines() if env_path.exists() else []
-        lines = [ln for ln in lines if not ln.startswith('ques_TOKEN=')] + [f'ques_TOKEN={token}']
-        env_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    return jsonify({'token': token_info()})
+    env_error = write_env_values({key: token for key in ENV_KEYS})      # always: the .env file is the permanent copy
+    return jsonify({'token': token_info(), 'env': {'saved': env_error is None, 'path': str(ENV_PATH), 'error': env_error}})
 
 
 @app.get('/api/token')
@@ -750,6 +838,7 @@ def api_pick_folder():
 
 @app.post('/api/run')
 def api_run():
+    sync_token_from_env()
     body = request.get_json(silent=True) or {}
     if JOB['status'] == 'running':
         return jsonify({'error': 'An ingestion is already running.'}), 409

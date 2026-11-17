@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-JSON_FOLDER = 'C:\\Users\\Administrator\\Downloads\\23PT17\\Ques(csv)\\csv'
+JSON_FOLDER = 'C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\csv2'
 PROCESSED_LOG_FILENAME = 'mcq_processed_log.json'
-API_BASE_URL = os.getenv('API_BASE_URL', 'https://campus.psgtech.ac.in/Dote/api/QuestionBank/SaveQuestion')
+API_BASE_URL = os.getenv('API_BASE_URL', 'https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion')
 AUTH_TOKEN = os.getenv('AUTH_TOKEN')
 EXAM_ID_DEFAULT = 1
 

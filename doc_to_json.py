@@ -16,7 +16,7 @@ except ImportError:_etree=None
 INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
 OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
 load_dotenv()
-POLY_API_BASE=os.getenv('POLY_API_BASE','https://campus.psgtech.ac.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
+POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')
 POLY_REFRESH_URL=os.getenv('POLY_REFRESH_URL',POLY_API_BASE+'/RefreshImageUrls')
 POLY_TOKEN=os.getenv('ques_TOKEN')
@@ -55,14 +55,6 @@ def _is_real_table(pars_table):
 				if _lineage_says_table(par):return True
 	return False
 
-# ---------------------------------------------------------------------------
-# LaTeX -> <span data-type="math-inline" ...> conversion
-# Output format is matched to the frontend's cleanQuestionHtml() regex:
-#   <span ... data-type="math-inline" ... data-latex="..." ...> ... </span> </span>
-# The frontend decodes &amp; (globally, up front), then &quot; and &#39; inside
-# the callback. It does NOT decode &lt; / &gt;, so < and > are emitted as
-# \lt / \gt LaTeX commands instead.
-# ---------------------------------------------------------------------------
 def _clean_latex_body(latex:str)->str:
 	# Normalise the LaTeX body BEFORE it goes into the span.
 	latex=_fix_math_unicode(f'$${latex}$$')[2:-2]
@@ -701,3 +693,4 @@ def main():
 	try:run_pipeline(input_path,output_path)
 	except(FileNotFoundError,ValueError)as e:sys.exit(str(e))
 if __name__=='__main__':main()
+

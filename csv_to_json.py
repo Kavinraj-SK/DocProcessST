@@ -3,7 +3,7 @@ import json
 import os
 import openpyxl
 
-folder_path = r"C:\Users\Administrator\Downloads\23PT17\Ques(csv)\csv"
+folder_path = r"C:\Users\Administrator\Downloads\23PT17\zDocProcessor-main\csv2"
 
 all_files = os.listdir(folder_path)
 converted_count = 0

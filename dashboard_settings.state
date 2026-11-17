@@ -1,8 +1,8 @@
 {
-  "mode": "csv",
-  "folder": "C:/Users/Administrator/Downloads/23PT17/zDocProcessor-main/test2",
-  "csv_folder": "C:/Users/Administrator/Downloads/23PT17/zDocProcessor-main/test2",
-  "api_url": "https://campus.psgtech.ac.in/Dote/api/QuestionBank/SaveQuestion",
+  "mode": "docx",
+  "folder": "C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test",
+  "csv_folder": "C:/Users/Administrator/Downloads/23PT17/zDocProcessor-main/test",
+  "api_url": "https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion",
   "exam_id": 31,
   "qb_config_id": 17,
   "mark": 7.0,
