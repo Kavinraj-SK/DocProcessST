@@ -13,8 +13,10 @@ try:import imagecodecs as _imagecodecs
 except ImportError:_imagecodecs=None
 try:from lxml import etree as _etree
 except ImportError:_etree=None
+
 INPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
 OUTPUT_PATH='C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\test'
+
 load_dotenv()
 POLY_API_BASE=os.getenv('POLY_API_BASE','https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion').rstrip('/')
 POLY_UPLOAD_URL=os.getenv('POLY_UPLOAD_URL',POLY_API_BASE+'/UploadQuestionImages')
@@ -74,6 +76,7 @@ def _escape_latex_attr(latex:str)->str:
 	latex=latex.replace('<',r'\lt ').replace('>',r'\gt ')
 	# & first; JS turns &amp; -> & globally, then decodes &quot; / &#39; in the callback.
 	return latex.replace('&','&amp;').replace('"','&quot;').replace("'",'&#39;')
+
 def convert_latex_to_span(text:str)->str:
 	if not text:return text
 	def _replace(match):
@@ -85,6 +88,7 @@ def convert_latex_to_span(text:str)->str:
 	text=re.sub('(\\$\\$)([\\s\\S]+?)(\\$\\$)',_replace,text)
 	text=re.sub('(\\$)([^$\\n]+?)(\\$)',_replace,text)
 	return text
+
 def _flatten_entry(text_table):
 	lines=[]
 	for row in text_table:
@@ -378,13 +382,7 @@ def extract_questions_from_docx(docx_path:Path):
         flags.append({'reason':f"No standard question headings found; parsed with the fallback layout '{layout}'. Please review the questions before uploading."})
     return questions,flags
 
-# ---------------------------------------------------------------------------
-# Fallback layouts. Used only when collect_digit_blocks() finds nothing.
-#   1. practical blocks : "PRACTICAL PART / Question ..." paragraphs; everything after an
-#                         "OUTPUT" line (the student's answer-sheet tables) is dropped
-#   2. numbered list    : "1) ...  2) ..." lines (typically all inside one table cell)
-#   3. heading items    : "(i). ..." headings with "(a) ..." sub-items and image lines
-# ---------------------------------------------------------------------------
+
 _STOP='\x00STOP'
 _NUM_Q_RE=re.compile(r'^\s*(\d{1,3})\s*[).]\s+(\S.*)$')
 _PRACTICAL_MARK_RE=re.compile(r'^\s*(?:[ivxIVX]+\s*[.)])?\s*PRACTICAL\s*PART\b',re.I)

@@ -6,15 +6,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 JSON_FOLDER = 'C:\\Users\\Administrator\\Downloads\\23PT17\\zDocProcessor-main\\csv2'
+
 PROCESSED_LOG_FILENAME = 'mcq_processed_log.json'
+
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://polyexam.tnedu.in/Dote/api/QuestionBank/SaveQuestion')
 AUTH_TOKEN = os.getenv('AUTH_TOKEN')
-EXAM_ID_DEFAULT = 1
 
-# Q_MARKS attrval_code mapping (attr_id 82): row MARK -> code sent in the payload
-#   1 = 1 MARK, 2 = 2 MARKS, 3 = 5 MARKS, 4 = 10 MARKS, 5 = 12 MARKS,
-#   6 = 15 MARKS, 7 = 100 MARKS, 8 = 3 MARKS, 9 = 50 MARKS
+
 MARK_TO_ATTRVAL_CODE = {1: 1, 2: 2, 3: 8}
+
+EXAM_ID_DEFAULT = 1
 
 
 def check_token_expiry(token: str):

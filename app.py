@@ -511,7 +511,8 @@ def run_job(stems, opts):
     sync_token_from_env()
     folder = folder_path()
     files = scan(folder)
-    do_convert, do_save, dry = opts['convert'], opts['save'], opts['dry_run']
+    do_convert, do_save = opts['convert'], opts['save']
+    dry = False
     csv_mode = current_mode() == 'csv'
     stems = [s for s in stems if s in files]
     per_file = int(do_convert) + int(do_save)
@@ -843,10 +844,9 @@ def api_run():
     if JOB['status'] == 'running':
         return jsonify({'error': 'An ingestion is already running.'}), 409
     do_convert, do_save = bool(body.get('convert', True)), bool(body.get('save', True))
-    dry = bool(body.get('dry_run', False))
     if not (do_convert or do_save):
         return jsonify({'error': 'Choose at least one step: convert or save.'}), 400
-    needs_token = (do_save and not dry) or (do_convert and current_mode() != 'csv')   # Word conversion uploads images
+    needs_token = do_save or (do_convert and current_mode() != 'csv')   # Word conversion uploads images
     if needs_token:
         info = token_info()
         if not info['present']:
@@ -869,7 +869,7 @@ def api_run():
             return jsonify({'error': 'Limit must be a whole number.'}), 400
     if not stems:
         return jsonify({'error': 'No files to process in the folder.'}), 400
-    opts = {'convert': do_convert, 'save': do_save, 'dry_run': dry}
+    opts = {'convert': do_convert, 'save': do_save}
     threading.Thread(target=run_job, args=(stems, opts), daemon=True).start()
     time.sleep(0.05)
     return jsonify({'started': True, 'files': len(stems)})

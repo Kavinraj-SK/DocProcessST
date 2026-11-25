@@ -209,7 +209,6 @@
     <div class="group">
       <label class="check"><input type="checkbox" id="optConvert" checked> Convert to JSON</label>
       <label class="check"><input type="checkbox" id="optSave" checked> Save to question bank</label>
-      <label class="check" title="Runs the save step without sending anything to SaveQuestion"><input type="checkbox" id="optDry"> Dry run</label>
       <label class="check">First <input class="field limit" id="optLimit" type="number" min="1" placeholder="all"> files</label>
       <button class="btn" id="allImagesBtn" type="button">All images</button>
       <button class="btn primary" id="runBtn" type="button">Run ingestion</button>
@@ -410,7 +409,7 @@
     if (!s) return '<span class="muted">Not saved</span>';
     if (s.skipped) return chip('warn', 'Skipped: ' + s.skipped);
     const out = [];
-    out.push(s.dry_run ? chip('warn', `${s.saved} would save (dry run)`) : chip(s.saved ? 'ok' : 'warn', `${s.saved} saved`));
+    out.push(chip(s.saved ? 'ok' : 'warn', `${s.saved} saved`));
     if (s.duplicate) out.push(chip('warn', `${s.duplicate} duplicate`));
     if (s.error) out.push(chip('bad', `${s.error} failed`));
     if (s.subject_missing) out.push(chip('bad', 'subject not found'));
@@ -502,13 +501,13 @@
 
   /* ---------- actions ---------- */
   async function run(stems) {
-    const convert = $('#optConvert').checked, save = $('#optSave').checked, dry = $('#optDry').checked;
+    const convert = $('#optConvert').checked, save = $('#optSave').checked;
     const limit = $('#optLimit').value ? parseInt($('#optLimit').value, 10) : null;
     const target = stems || (S.selected.size ? [...S.selected] : null);
     const count = target ? target.length : S.rows.length;
-    if (save && !dry && !confirm(`Save ${count} ${count === 1 ? 'file' : 'files'} to the question bank? Duplicates are rejected by the server.`)) return;
+    if (save && !confirm(`Save ${count} ${count === 1 ? 'file' : 'files'} to the question bank? Duplicates are rejected by the server.`)) return;
     try {
-      await api('/api/run', { method: 'POST', body: { stems: target, convert, save, dry_run: dry, limit } });
+      await api('/api/run', { method: 'POST', body: { stems: target, convert, save, limit } });
       S.running = true; S.job = { ...S.job, status: 'running', index: 0, total_files: count, percent: 0, steps_done: 0 };
       renderProgress(); renderRows();
     } catch (e) { toast(e.message); }
